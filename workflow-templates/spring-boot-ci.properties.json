@@ -1,0 +1,7 @@
+{
+  "name": "GRaCe-GRC Spring Boot CI",
+  "description": "Build and test a Java 21 Spring Boot service with the Maven wrapper.",
+  "iconName": "octicon package",
+  "categories": ["Java", "Maven"],
+  "filePatterns": ["pom.xml$"]
+}

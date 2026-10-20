@@ -1,0 +1,22 @@
+# OS
+.DS_Store
+Thumbs.db
+Desktop.ini
+._*
+
+# Editors / IDEs
+.idea/
+.vscode/
+*.swp
+*~
+
+# Local / secrets
+.env
+.env.*
+*.pem
+*.key
+
+# Misc
+tmp/
+*.tmp
+*.bak

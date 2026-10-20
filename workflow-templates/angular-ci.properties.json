@@ -1,0 +1,7 @@
+{
+  "name": "GRaCe-GRC Angular CI",
+  "description": "Lint, test and build the Angular Admin Console.",
+  "iconName": "octicon browser",
+  "categories": ["TypeScript", "Angular"],
+  "filePatterns": ["angular.json$"]
+}
