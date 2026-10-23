@@ -7,6 +7,14 @@ on:
         description: Temurin Java version
         type: string
         default: '25'
+      jacoco-version:
+        description: JaCoCo Maven plugin version for the coverage report
+        type: string
+        default: '0.8.14'
+      scripts-ref:
+        description: Ref of GRaCe-GRC/.github to take the CI scripts from
+        type: string
+        default: main
 
 permissions:
   contents: read
@@ -22,4 +30,23 @@ jobs:
           java-version: ${{ inputs.java-version }}
           cache: maven
       - name: Build and test
-        run: ./mvnw -B verify
+        env:
+          JACOCO: org.jacoco:jacoco-maven-plugin:${{ inputs.jacoco-version }}
+        run: ./mvnw -B "$JACOCO:prepare-agent" verify "$JACOCO:report"
+      - name: Check out the CI scripts
+        uses: actions/checkout@v7
+        with:
+          repository: GRaCe-GRC/.github
+          ref: ${{ inputs.scripts-ref }}
+          path: .grace-ci
+          sparse-checkout: scripts
+          persist-credentials: false
+      - name: Coverage summary
+        run: bash .grace-ci/scripts/jacoco-summary.sh target/site/jacoco/jacoco.csv >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload coverage report
+        if: hashFiles('target/site/jacoco/index.html') != ''
+        uses: actions/upload-artifact@v7
+        with:
+          name: jacoco-report
+          path: target/site/jacoco
+          retention-days: 14

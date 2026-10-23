@@ -5,7 +5,7 @@ workflows instead of copying the steps.
 
 | Workflow | Steps |
 |---|---|
-| `maven-ci.yml` | Set up Temurin, `./mvnw -B verify` |
+| `maven-ci.yml` | Set up Temurin, `./mvnw -B verify` with a JaCoCo coverage report |
 | `angular-ci.yml` | Set up Node.js, `npm ci`, `npm run lint`, `npm test -- --watch=false`, `npm run build` |
 | `release.yml` | Tag a semantic version, create a GitHub Release, push the image to GHCR |
 
@@ -106,11 +106,36 @@ git push origin v0.0.1
 The first push creates the package in the organization. If it is not public, open the package
 settings and change its visibility to **Public**, so the sandbox can pull it without signing in.
 
+## Coverage
+
+`maven-ci.yml` measures unit test coverage with JaCoCo on every run. It is a report only: there is
+no minimum, so coverage never fails a build.
+
+- Runs `./mvnw -B org.jacoco:jacoco-maven-plugin:<version>:prepare-agent verify
+  org.jacoco:jacoco-maven-plugin:<version>:report`, so repositories need no `pom.xml` changes
+- Line and branch totals are in the job summary, written by
+  [`scripts/jacoco-summary.sh`](../../scripts/jacoco-summary.sh) (bash and awk). The workflow checks out
+  `scripts/` from this repository into `.grace-ci` (ref `scripts-ref`, default `main`), because a
+  reusable workflow runs in the caller's checkout. Without a report the summary says so and the
+  build is not affected
+- The HTML report (`target/site/jacoco`) is uploaded as the `jacoco-report` artifact, kept 14 days
+
+JaCoCo adds its agent to the `argLine` property. Repositories that load the Mockito agent in
+Surefire must use the late-replacement form, so both agents are loaded:
+
+```xml
+<argLine>@{argLine} -javaagent:${org.mockito:mockito-core:jar}</argLine>
+```
+
+with an empty `<argLine></argLine>` in `<properties>` for builds without JaCoCo.
+
 ## Inputs
 
 | Workflow | Input | Default | Description |
 |---|---|---|---|
 | `maven-ci.yml` | `java-version` | `25` | Temurin Java version |
+| `maven-ci.yml` | `jacoco-version` | `0.8.14` | JaCoCo Maven plugin version for the coverage report |
+| `maven-ci.yml` | `scripts-ref` | `main` | Ref of `GRaCe-GRC/.github` to take the CI scripts (`scripts/`) from |
 | `angular-ci.yml` | `node-version` | `24` | Node.js version |
 | `release.yml` | `initial-development` | `true` | Breaking changes bump the minor version (`0.x`); set `false` from 1.0 |
 | `release.yml` | `java-version` | `25` | Temurin Java version for the image build (Maven repositories) |
