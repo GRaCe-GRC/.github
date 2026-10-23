@@ -41,7 +41,7 @@ jobs:
           npm install --no-save --no-audit --no-fund --prefix "$RUNNER_TEMP/semantic-release"
           semantic-release@25.0.9
           @semantic-release/exec@7.1.0
-          conventional-changelog-conventionalcommits@10.4.1
+          conventional-changelog-conventionalcommits@9.3.1
       - name: Write configuration
         env:
           BREAKING_RELEASE: ${{ inputs.initial-development && 'minor' || 'major' }}
