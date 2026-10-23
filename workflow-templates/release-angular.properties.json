@@ -1,0 +1,7 @@
+{
+  "name": "GRaCe-GRC Release (Angular)",
+  "description": "On every merge to the default branch: angular-ci, then tag a semantic version and push the image to GHCR.",
+  "iconName": "octicon rocket",
+  "categories": ["TypeScript", "Angular"],
+  "filePatterns": ["angular.json$"]
+}
