@@ -1,0 +1,7 @@
+{
+  "name": "GRaCe-GRC Release (Maven)",
+  "description": "On every merge to the default branch: maven-ci, then tag a semantic version and push the image to GHCR.",
+  "iconName": "octicon rocket",
+  "categories": ["Java", "Maven"],
+  "filePatterns": ["pom.xml$"]
+}

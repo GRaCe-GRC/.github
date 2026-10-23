@@ -1,0 +1,142 @@
+name: Release
+
+on:
+  workflow_call:
+    inputs:
+      initial-development:
+        description: Breaking changes bump the minor version (0.x) instead of the major version
+        type: boolean
+        default: true
+      java-version:
+        description: Temurin Java version for Maven repositories
+        type: string
+        default: '25'
+    outputs:
+      version:
+        description: Released version, empty when nothing was released
+        value: ${{ jobs.tag.outputs.version }}
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  tag:
+    runs-on: ubuntu-latest
+    concurrency:
+      group: release-${{ github.repository }}
+    permissions:
+      contents: write
+    outputs:
+      version: ${{ steps.release.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+      - name: Install semantic-release
+        run: >-
+          npm install --no-save --no-audit --no-fund --prefix "$RUNNER_TEMP/semantic-release"
+          semantic-release@25.0.9
+          @semantic-release/exec@7.1.0
+          conventional-changelog-conventionalcommits@10.4.1
+      - name: Write configuration
+        env:
+          BREAKING_RELEASE: ${{ inputs.initial-development && 'minor' || 'major' }}
+        run: |
+          jq -n --arg breaking "$BREAKING_RELEASE" '{
+            branches: ["main"],
+            tagFormat: "v${version}",
+            plugins: [
+              ["@semantic-release/commit-analyzer", {
+                preset: "conventionalcommits",
+                releaseRules: [{breaking: true, release: $breaking}]
+              }],
+              ["@semantic-release/release-notes-generator", {preset: "conventionalcommits"}],
+              ["@semantic-release/github", {successComment: false, failComment: false, releasedLabels: false}],
+              ["@semantic-release/exec", {successCmd: "echo \"version=${nextRelease.version}\" >> \"$GITHUB_OUTPUT\""}]
+            ]
+          }' > .releaserc.json
+      - name: Tag and create the GitHub Release
+        id: release
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: '"$RUNNER_TEMP/semantic-release/node_modules/.bin/semantic-release"'
+
+  image:
+    needs: tag
+    if: needs.tag.outputs.version != ''
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    env:
+      VERSION: ${{ needs.tag.outputs.version }}
+      SOURCE: ${{ github.server_url }}/${{ github.repository }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: Image name
+        id: image
+        run: echo "name=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+
+      - if: hashFiles('pom.xml') != ''
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: ${{ inputs.java-version }}
+          cache: maven
+      - name: Build and push with buildpacks
+        if: hashFiles('pom.xml') != ''
+        env:
+          IMAGE: ${{ steps.image.outputs.name }}
+        run: |
+          ./mvnw -B -DskipTests spring-boot:build-image -Drevision="$VERSION" -Dspring-boot.build-image.imageName="$IMAGE:built"
+          printf 'FROM %s\n' "$IMAGE:built" | docker build \
+            --label "org.opencontainers.image.source=$SOURCE" \
+            --label "org.opencontainers.image.version=$VERSION" \
+            -t "$IMAGE:$VERSION" -t "$IMAGE:latest" -
+          docker push "$IMAGE:$VERSION"
+          docker push "$IMAGE:latest"
+
+      - name: Set package version
+        if: hashFiles('pom.xml') == '' && hashFiles('package.json') != ''
+        run: npm version "$VERSION" --no-git-tag-version --allow-same-version
+      - if: hashFiles('pom.xml') == ''
+        uses: docker/setup-buildx-action@v4
+      - name: Build and push with the Dockerfile
+        if: hashFiles('pom.xml') == ''
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            ${{ steps.image.outputs.name }}:${{ env.VERSION }}
+            ${{ steps.image.outputs.name }}:latest
+          labels: |
+            org.opencontainers.image.source=${{ env.SOURCE }}
+            org.opencontainers.image.version=${{ env.VERSION }}
+
+  summary:
+    needs: [tag, image]
+    if: always() && needs.tag.result == 'success'
+    runs-on: ubuntu-latest
+    permissions: {}
+    steps:
+      - env:
+          VERSION: ${{ needs.tag.outputs.version }}
+          IMAGE_RESULT: ${{ needs.image.result }}
+          REPO: ${{ github.repository }}
+        run: |
+          if [ -z "$VERSION" ]; then
+            echo "No release: no \`feat\`, \`fix\` or breaking change since the last tag" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "Released **v$VERSION**; image \`ghcr.io/${REPO,,}:$VERSION\` ($IMAGE_RESULT)" >> "$GITHUB_STEP_SUMMARY"
+          fi
