@@ -84,12 +84,16 @@ The shared `release.yml` runs these jobs:
 
 | Repository | Image build |
 |---|---|
-| Has `pom.xml` | Cloud Native Buildpacks (`./mvnw spring-boot:build-image -Drevision=<version>`), `linux/amd64` |
+| Has `pom.xml` | Cloud Native Buildpacks (`./mvnw spring-boot:build-image -Drevision=<version>`) with the pinned builder, `linux/amd64` |
 | Otherwise | The repository's `Dockerfile`, `linux/amd64` and `linux/arm64`; `package.json` gets the version first |
 
 Maven repositories use `<version>${revision}</version>` in `pom.xml` so the build takes the
 released version. Images carry the `org.opencontainers.image.source` label, which links the
 package to its repository. Buildpacks images run under emulation on Apple silicon.
+
+The builder is pinned to a version tag because `latest` can change without notice (on 2026-10-23
+it was published as an `arm64`-only image). Update `buildpacks-builder` deliberately, after checking
+that the new tag has both `amd64` and `arm64`.
 
 Before the first release, tag the current `main` with the starting version, so the first
 `feat` becomes `0.1.0` instead of `1.0.0`:
@@ -110,6 +114,7 @@ settings and change its visibility to **Public**, so the sandbox can pull it wit
 | `angular-ci.yml` | `node-version` | `24` | Node.js version |
 | `release.yml` | `initial-development` | `true` | Breaking changes bump the minor version (`0.x`); set `false` from 1.0 |
 | `release.yml` | `java-version` | `25` | Temurin Java version for the image build (Maven repositories) |
+| `release.yml` | `buildpacks-builder` | `paketobuildpacks/builder-noble-java-tiny:0.0.200` | Buildpacks builder (Maven repositories); always a version tag |
 
 Override an input with `with`:
 
