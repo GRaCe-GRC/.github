@@ -8,6 +8,7 @@ Organization-wide defaults for every repository in **GRaCe-GRC**.
 | `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, `SECURITY.md`, `SUPPORT.md` | Default community health files |
 | `ISSUE_TEMPLATE/`, `PULL_REQUEST_TEMPLATE.md` | Default issue forms and PR template |
 | `workflow-templates/` | Starter caller workflows (branch verify and release, for Maven and Angular) |
+| `scripts/` | Scripts used by the reusable workflows (e.g. `jacoco-summary.sh`) |
 | `.github/workflows/` | Reusable workflows (Maven and Angular CI, release); see [how to use them](.github/workflows/README.md) |
 
 A repository that has its own version of any of these files uses its own copy instead of this default.
