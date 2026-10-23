@@ -1,0 +1,91 @@
+name: Image
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        description: Version to build and tag, without the leading v
+        type: string
+        required: true
+      java-version:
+        description: Temurin Java version for Maven repositories
+        type: string
+        default: '25'
+      push:
+        description: Push the image to GHCR; false only builds it
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  image:
+    runs-on: ubuntu-latest
+    env:
+      VERSION: ${{ inputs.version }}
+      SOURCE: ${{ github.server_url }}/${{ github.repository }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: Image name
+        id: image
+        run: echo "name=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
+      - if: inputs.push
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+
+      - if: hashFiles('pom.xml') != ''
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: ${{ inputs.java-version }}
+          cache: maven
+      - name: Build and push with buildpacks
+        if: hashFiles('pom.xml') != ''
+        env:
+          IMAGE: ${{ steps.image.outputs.name }}
+          PUSH: ${{ inputs.push }}
+        run: |
+          ./mvnw -B -DskipTests spring-boot:build-image -Drevision="$VERSION" -Dspring-boot.build-image.imageName="$IMAGE:built"
+          printf 'FROM %s\n' "$IMAGE:built" | docker build \
+            --label "org.opencontainers.image.source=$SOURCE" \
+            --label "org.opencontainers.image.version=$VERSION" \
+            -t "$IMAGE:$VERSION" -t "$IMAGE:latest" -
+          if [ "$PUSH" = "true" ]; then
+            docker push "$IMAGE:$VERSION"
+            docker push "$IMAGE:latest"
+          fi
+
+      - name: Set package version
+        if: hashFiles('pom.xml') == '' && hashFiles('package.json') != ''
+        run: npm version "$VERSION" --no-git-tag-version --allow-same-version
+      - if: hashFiles('pom.xml') == ''
+        uses: docker/setup-buildx-action@v4
+      - name: Build and push with the Dockerfile
+        if: hashFiles('pom.xml') == ''
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: ${{ inputs.push }}
+          tags: |
+            ${{ steps.image.outputs.name }}:${{ inputs.version }}
+            ${{ steps.image.outputs.name }}:latest
+          labels: |
+            org.opencontainers.image.source=${{ env.SOURCE }}
+            org.opencontainers.image.version=${{ inputs.version }}
+
+      - name: Summary
+        env:
+          IMAGE: ${{ steps.image.outputs.name }}
+          PUSH: ${{ inputs.push }}
+        run: |
+          if [ "$PUSH" = "true" ]; then
+            echo "Published \`$IMAGE:$VERSION\` and \`$IMAGE:latest\`" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "Built \`$IMAGE:$VERSION\` (not pushed)" >> "$GITHUB_STEP_SUMMARY"
+          fi
