@@ -11,6 +11,10 @@ on:
         description: Temurin Java version for Maven repositories
         type: string
         default: '25'
+      buildpacks-builder:
+        description: Cloud Native Buildpacks builder image for Maven repositories (a version tag, not latest)
+        type: string
+        default: paketobuildpacks/builder-noble-java-tiny:0.0.200
     outputs:
       version:
         description: Released version, empty when nothing was released
@@ -96,8 +100,12 @@ jobs:
         if: hashFiles('pom.xml') != ''
         env:
           IMAGE: ${{ steps.image.outputs.name }}
+          BUILDER: ${{ inputs.buildpacks-builder }}
         run: |
-          ./mvnw -B -DskipTests spring-boot:build-image -Drevision="$VERSION" -Dspring-boot.build-image.imageName="$IMAGE:built"
+          ./mvnw -B -DskipTests spring-boot:build-image -Drevision="$VERSION" \
+            -Dspring-boot.build-image.builder="$BUILDER" \
+            -Dspring-boot.build-image.imagePlatform=linux/amd64 \
+            -Dspring-boot.build-image.imageName="$IMAGE:built"
           printf 'FROM %s\n' "$IMAGE:built" | docker build \
             --label "org.opencontainers.image.source=$SOURCE" \
             --label "org.opencontainers.image.version=$VERSION" \
