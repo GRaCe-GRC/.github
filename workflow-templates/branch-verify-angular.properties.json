@@ -1,0 +1,7 @@
+{
+  "name": "GRaCe-GRC Branch verify (Angular)",
+  "description": "Build and test the branch with angular-ci on every push and pull request.",
+  "iconName": "octicon check-circle",
+  "categories": ["TypeScript", "Angular"],
+  "filePatterns": ["angular.json$"]
+}
