@@ -1,0 +1,7 @@
+{
+  "name": "GRaCe-GRC Branch verify (Maven)",
+  "description": "Build and test the branch with maven-ci on every push and pull request.",
+  "iconName": "octicon check-circle",
+  "categories": ["Java", "Maven"],
+  "filePatterns": ["pom.xml$"]
+}

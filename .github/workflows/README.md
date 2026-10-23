@@ -1,54 +1,44 @@
 # Reusable workflows
 
-Shared CI for GRaCe-GRC repositories. A repository keeps a small `ci.yml` that calls one of these
+Shared CI for GRaCe-GRC repositories. A repository keeps small caller workflows that call these
 workflows instead of copying the steps.
 
-| Workflow | For | Steps |
-|---|---|---|
-| `maven-ci.yml` | Java / Spring Boot services | Set up Temurin, `./mvnw -B verify` |
-| `angular-ci.yml` | Angular applications | Set up Node.js, `npm ci`, `npm run lint`, `npm test -- --watch=false`, `npm run build` |
+| Workflow | Steps |
+|---|---|
+| `maven-ci.yml` | Set up Temurin, `./mvnw -B verify` |
+| `angular-ci.yml` | Set up Node.js, `npm ci`, `npm run lint`, `npm test -- --watch=false`, `npm run build` |
 
-## Usage
+## Branch verify
 
-Add `.github/workflows/ci.yml` to the repository.
-
-### Maven
+Every repository has `.github/workflows/branch-verify.yml`. It runs on every push to a branch
+other than `main`, and on every pull request. Java services call `maven-ci.yml`:
 
 ```yaml
-name: CI
+name: Branch verify
 
 on:
   push:
-    branches: [ main ]
+    branches-ignore: [ main ]
   pull_request:
 
 permissions:
   contents: read
 
 jobs:
-  ci:
+  verify:
     uses: GRaCe-GRC/.github/.github/workflows/maven-ci.yml@main
 ```
 
-### Angular
+`admin-console-ui` calls `angular-ci.yml` instead:
 
 ```yaml
-name: CI
-
-on:
-  push:
-    branches: [ main ]
-  pull_request:
-
-permissions:
-  contents: read
-
 jobs:
-  ci:
+  verify:
     uses: GRaCe-GRC/.github/.github/workflows/angular-ci.yml@main
 ```
 
-The Angular workflow expects `lint`, `test` and `build` scripts in `package.json`.
+A branch with an open pull request gets two runs per push: one for the push and one for the pull
+request. Angular repositories need `lint`, `test` and `build` scripts in `package.json`.
 
 ## Inputs
 
@@ -61,7 +51,7 @@ Override an input with `with`:
 
 ```yaml
 jobs:
-  ci:
+  verify:
     uses: GRaCe-GRC/.github/.github/workflows/maven-ci.yml@main
     with:
       java-version: '21'
@@ -69,5 +59,6 @@ jobs:
 
 ## Starter templates
 
-The workflow templates in [`workflow-templates/`](../../workflow-templates) contain the same `ci.yml`
-callers. In a repository, choose **Actions → New workflow** to add one.
+The workflow templates in [`workflow-templates/`](../../workflow-templates) contain the same
+caller workflows (`branch-verify-maven`, `branch-verify-angular`). In a repository, choose
+**Actions → New workflow** to add one.
